@@ -1,0 +1,10 @@
+[default]
+username='fill me in'
+password='fill me in'
+output='json'
+
+[default.influxdb]
+token='fill me in, maybe'
+org='some org'
+url = "some url"
+
