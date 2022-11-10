@@ -2,6 +2,7 @@
 username='fill me in'
 password='fill me in'
 output='json'
+days=10
 
 [default.influxdb]
 token='fill me in, maybe'

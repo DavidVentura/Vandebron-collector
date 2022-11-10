@@ -6,7 +6,7 @@ import uuid
 import requests
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List, Dict, Any, Tuple, Optional
 from urllib.parse import urlparse, parse_qs
 
@@ -111,13 +111,17 @@ class Vandebron:
             connections.append(Connection(con["marketSegment"], con["connectionId"]))
         return connections
 
-    def get_connection_usage(self, c: Connection, start_date: date, end_date: date) -> Dict[str, Any]:
+    def get_connection_usage(self, c: Connection, measurement_date: date) -> Dict[str, Any]:
         url = Vandebron.URLs.USAGE.format(user_id=self.user.user_id, conn_id=c.conn_id)
+        sd = f'{measurement_date.isoformat()}T00:00:00.000Z'
+        ed = f'{measurement_date.isoformat()}T23:59:59.999Z'
         r = self._session.get(
             url,
-            params={"resolution": "Days", "startDate": start_date.isoformat(), "endDate": end_date.isoformat()},
+            params={"resolution": "Hours", "startDateTime": sd, "endDateTime": ed},
             headers=self._headers,
         )
+        if not r.ok:
+            print(r.json())
         r.raise_for_status()
         return {**r.json(), "market": c.market_segment}
 
@@ -163,11 +167,18 @@ def output_influxdb(data: List[Dict[str, Any]]) -> None:
             write_api.write(bucket=bucket, org=settings.INFLUXDB.ORG, record=point)
 
 
+
 v = Vandebron(settings.USERNAME, settings.PASSWORD)
 v.login()
-start, _ = _month_range(date.today().replace(month=10))
+
 end = date.today()
-data = [v.get_connection_usage(conn, start, end) for conn in v.get_connections()]
+start = end - timedelta(days=settings.DAYS)
+
+data = []
+for conn in v.get_connections():
+    for delta in range(0, (end - start).days):
+        measurement_date = start + timedelta(days=delta)
+        data.append(v.get_connection_usage(conn, measurement_date))
 
 if settings.OUTPUT == 'influxdb':
     print("Pushing to influxdb")
