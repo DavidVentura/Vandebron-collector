@@ -11,7 +11,6 @@ from typing import List, Dict, Any, Tuple, Optional
 from urllib.parse import urlparse, parse_qs
 
 from bs4 import BeautifulSoup
-from dynaconf import settings
 
 
 @dataclass
@@ -167,21 +166,24 @@ def output_influxdb(data: List[Dict[str, Any]]) -> None:
             write_api.write(bucket=bucket, org=settings.INFLUXDB.ORG, record=point)
 
 
+if __name__ == "__main__":
 
-v = Vandebron(settings.USERNAME, settings.PASSWORD)
-v.login()
+    from dynaconf import settings
 
-end = date.today()
-start = end - timedelta(days=settings.DAYS)
+    v = Vandebron(settings.USERNAME, settings.PASSWORD)
+    v.login()
 
-data = []
-for conn in v.get_connections():
-    for delta in range(0, (end - start).days):
-        measurement_date = start + timedelta(days=delta)
-        data.append(v.get_connection_usage(conn, measurement_date))
+    end = date.today()
+    start = end - timedelta(days=settings.DAYS)
 
-if settings.OUTPUT == 'influxdb':
-    print("Pushing to influxdb")
-    output_influxdb(data)
-else:
-    output_print_json(data)
+    data = []
+    for conn in v.get_connections():
+        for delta in range(0, (end - start).days):
+            measurement_date = start + timedelta(days=delta)
+            data.append(v.get_connection_usage(conn, measurement_date))
+
+    if settings.OUTPUT == 'influxdb':
+        print("Pushing to influxdb")
+        output_influxdb(data)
+    else:
+        output_print_json(data)
