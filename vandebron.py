@@ -111,9 +111,12 @@ class Vandebron:
         return connections
 
     def get_connection_usage(self, c: Connection, measurement_date: date) -> Dict[str, Any]:
+        next_day = measurement_date + timedelta(days=1)
         url = Vandebron.URLs.USAGE.format(user_id=self.user.user_id, conn_id=c.conn_id)
-        sd = f'{measurement_date.isoformat()}T00:00:00.000Z'
-        ed = f'{measurement_date.isoformat()}T23:59:59.999Z'
+        # Note: the server interprets the timestamp as NL local time, even when appending a "Z". The returned
+        # timestamps on the other hand are in UTC.
+        sd = f'{measurement_date.isoformat()}T00:15:00.000'
+        ed = f'{next_day.isoformat()}T00:00:00.000'
         r = self._session.get(
             url,
             params={"resolution": "Hours", "startDateTime": sd, "endDateTime": ed},
