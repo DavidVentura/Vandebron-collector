@@ -92,7 +92,7 @@ class Vandebron:
 
     def login(self) -> None:
         self._token = self._get_token()
-        self.user = v._get_user()
+        self.user = self._get_user()
 
     def _get_user(self) -> UserInfo:
         r = self._session.get(Vandebron.URLs.USER_INFO, headers=self._headers)
