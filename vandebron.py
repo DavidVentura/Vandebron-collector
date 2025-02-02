@@ -11,7 +11,6 @@ from typing import List, Dict, Any, Tuple, Optional
 from urllib.parse import urlparse, parse_qs
 
 from bs4 import BeautifulSoup
-from dynaconf import settings
 
 
 @dataclass
@@ -93,7 +92,7 @@ class Vandebron:
 
     def login(self) -> None:
         self._token = self._get_token()
-        self.user = v._get_user()
+        self.user = self._get_user()
 
     def _get_user(self) -> UserInfo:
         r = self._session.get(Vandebron.URLs.USER_INFO, headers=self._headers)
@@ -112,9 +111,12 @@ class Vandebron:
         return connections
 
     def get_connection_usage(self, c: Connection, measurement_date: date) -> Dict[str, Any]:
+        next_day = measurement_date + timedelta(days=1)
         url = Vandebron.URLs.USAGE.format(user_id=self.user.user_id, conn_id=c.conn_id)
-        sd = f'{measurement_date.isoformat()}T00:00:00.000Z'
-        ed = f'{measurement_date.isoformat()}T23:59:59.999Z'
+        # Note: the server interprets the timestamp as NL local time, even when appending a "Z". The returned
+        # timestamps on the other hand are in UTC.
+        sd = f'{measurement_date.isoformat()}T00:15:00.000'
+        ed = f'{next_day.isoformat()}T00:00:00.000'
         r = self._session.get(
             url,
             params={"resolution": "Hours", "startDateTime": sd, "endDateTime": ed},
@@ -167,21 +169,24 @@ def output_influxdb(data: List[Dict[str, Any]]) -> None:
             write_api.write(bucket=bucket, org=settings.INFLUXDB.ORG, record=point)
 
 
+if __name__ == "__main__":
 
-v = Vandebron(settings.USERNAME, settings.PASSWORD)
-v.login()
+    from dynaconf import settings
 
-end = date.today()
-start = end - timedelta(days=settings.DAYS)
+    v = Vandebron(settings.USERNAME, settings.PASSWORD)
+    v.login()
 
-data = []
-for conn in v.get_connections():
-    for delta in range(0, (end - start).days):
-        measurement_date = start + timedelta(days=delta)
-        data.append(v.get_connection_usage(conn, measurement_date))
+    end = date.today()
+    start = end - timedelta(days=settings.DAYS)
 
-if settings.OUTPUT == 'influxdb':
-    print("Pushing to influxdb")
-    output_influxdb(data)
-else:
-    output_print_json(data)
+    data = []
+    for conn in v.get_connections():
+        for delta in range(0, (end - start).days):
+            measurement_date = start + timedelta(days=delta)
+            data.append(v.get_connection_usage(conn, measurement_date))
+
+    if settings.OUTPUT == 'influxdb':
+        print("Pushing to influxdb")
+        output_influxdb(data)
+    else:
+        output_print_json(data)
